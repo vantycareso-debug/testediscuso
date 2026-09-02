@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sir. Cond. COLY - Módulo Visual Estável</title>
+    <title>Sir. Cond. COLY - Módulo Visual e Voz Neural</title>
     <style>
         body {
             background-color: #010610;
@@ -54,7 +54,6 @@
             justify-content: flex-end;
         }
 
-        /* O Homem - Respiração Contínua de Fundo */
         .hologram-character {
             width: 250px;
             height: 320px;
@@ -76,7 +75,6 @@
             left: 0;
         }
 
-        /* Camadas Artificiais de Expressão (Boca e Mãos Néon) */
         .digital-lips {
             position: absolute;
             top: 27%;
@@ -103,7 +101,6 @@
             opacity: 0;
         }
 
-        /* --- 🎭 ESTADO DE FALA DIGITAL (Simulação Ativa) --- */
         .talking .hologram-character {
             animation: respirarNatural 1.5s ease-in-out infinite alternate, flickerLight 0.05s infinite, gesticularCorpo 0.2s infinite alternate !important;
         }
@@ -187,7 +184,6 @@
             text-align: left;
         }
 
-        /* --- KEYFRAMES DE ANIMAÇÃO --- */
         @keyframes respirarNatural {
             0% { transform: translateY(0px) scaleY(1) scaleX(1); }
             50% { transform: translateY(-3px) scaleY(1.015) scaleX(0.995); }
@@ -245,26 +241,77 @@
         const textLog = document.getElementById('text-log');
         const userInput = document.getElementById('user-input');
 
-        // Escuta a tecla Enter diretamente no campo de texto
-        userInput.addEventListener("keypress", function(e) {
-            if (e.key === "Enter") {
-                enviarComando();
-            }
+        userInput.addEventListener("keypress", (e) => { 
+            if (e.key === "Enter") enviarComando(); 
         });
 
-        function simularFalaVisual(textoIA) {
-            // Ativa o estado de fala (Gesticulação, Lábios e Mão Néon a mexer em loops rápidos)
-            stageBox.classList.add('talking');
-            statusMsg.innerText = "SIR. COLY A RESPONDER...";
+        function falarTexto(texto) {
+            // Chamada direta à voz masculina Cristiano (PT-PT) da Amazon Polly via StreamElements
+            const vozMasculina = "Cristiano"; 
+            const urlAudio = `https://api.streamelements.com/kappa/v2/speech?voice=${vozMasculina}&text=${encodeURIComponent(texto)}`;
 
-            textLog.innerHTML += `<br><br><strong>> SIR. COLY:</strong> ${textoIA}`;
-            textLog.scrollTop = textLog.scrollHeight; 
+            const audio = new Audio();
+            audio.crossOrigin = "anonymous";
+            audio.src = urlAudio;
 
-            // Mantém a animação ativa por 4 segundos e depois volta à respiração calma
-            setTimeout(() => {
+            audio.onplay = () => {
+                stageBox.classList.add('talking');
+                statusMsg.innerText = "VOZ NEURAL ATIVA (CRISTIANO - HOMEM)";
+                statusMsg.style.color = "#00ffcc";
+            };
+
+            audio.onended = () => {
                 stageBox.classList.remove('talking');
                 statusMsg.innerText = "TERMINAL PRONTO.";
-            }, 4500);
+                statusMsg.style.color = "#00d2ff";
+            };
+
+            audio.onerror = (err) => {
+                console.error("Erro na API StreamElements:", err);
+                statusMsg.innerText = "AVISO: API BLOQUEADA -> A USAR VOZ DO SISTEMA";
+                statusMsg.style.color = "#ff9900";
+                falarNativoMasculino(texto);
+            };
+
+            audio.play().catch(err => {
+                console.warn("Autoplay bloqueado pelo navegador:", err);
+                statusMsg.innerText = "AVISO: AUTOPLAY BLOQUEADO -> A USAR VOZ DO SISTEMA";
+                statusMsg.style.color = "#ff9900";
+                falarNativoMasculino(texto);
+            });
+        }
+
+        function falarNativoMasculino(texto) {
+            if (!('speechSynthesis' in window)) return;
+            
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'pt-PT';
+
+            const vozes = window.speechSynthesis.getVoices();
+            const vozHomem = vozes.find(v => 
+                v.lang.includes('pt') && 
+                (v.name.toLowerCase().includes('duarte') || 
+                 v.name.toLowerCase().includes('daniel') || 
+                 v.name.toLowerCase().includes('ricardo') || 
+                 v.name.toLowerCase().includes('cristiano') ||
+                 v.name.toLowerCase().includes('male'))
+            );
+
+            if (vozHomem) {
+                utterance.voice = vozHomem;
+            }
+
+            utterance.onstart = () => stageBox.classList.add('talking');
+            utterance.onend = () => stageBox.classList.remove('talking');
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function simularFalaVisual(textoIA) {
+            textLog.innerHTML += `<br><br><strong>> SIR. COLY:</strong> ${textoIA}`;
+            textLog.scrollTop = textLog.scrollHeight; 
+            falarTexto(textoIA);
         }
 
         function enviarComando() {
