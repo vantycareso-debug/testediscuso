@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sir. Cond. COLY - Módulo Visual e Voz Neural</title>
+    <title>Sir. Cond. COLY - Módulo Visual e Voz</title>
     <style>
         body {
             background-color: #010610;
@@ -232,7 +232,7 @@
         </div>
 
         <div id="status-message" class="status-box">SISTEMA ONLINE // PRONTO PARA DIGITAR</div>
-        <div id="text-log" class="text-display">> COLY_SYS: Consola livre de erros. Escreva sobre reservas, quotas ou avarias e clique em Executar.</div>
+        <div id="text-log" class="text-display">> COLY_SYS: Sistema inicializado. Digite a sua questão e clique em Executar.</div>
     </div>
 
     <script>
@@ -245,93 +245,71 @@
             if (e.key === "Enter") enviarComando(); 
         });
 
-        // Pré-carrega as vozes locais do sistema operativo
-        let vozesLocais = [];
-        function carregarVozes() {
+        let vozesDisponiveis = [];
+
+        function inicializarVozes() {
             if ('speechSynthesis' in window) {
-                vozesLocais = window.speechSynthesis.getVoices();
+                vozesDisponiveis = window.speechSynthesis.getVoices();
             }
         }
-        carregarVozes();
+
+        inicializarVozes();
         if ('speechSynthesis' in window) {
-            window.speechSynthesis.onvoiceschanged = carregarVozes;
+            window.speechSynthesis.onvoiceschanged = inicializarVozes;
         }
 
         function falarTexto(texto) {
-            // Limpeza de carateres especiais para evitar erro 401 na API externa
-            const textoLimpo = texto
-                .replace(/[^a-zA-Z0-9 áàâãéèêíóòôõúçÁÀÂÃÉÈÊÍÓÒÔÕÚÇ]/g, "")
-                .trim();
-
-            const vozMasculina = "Cristiano"; 
-            const urlAudio = `https://api.streamelements.com/kappa/v2/speech?voice=${vozMasculina}&text=${encodeURIComponent(textoLimpo)}`;
-
-            const audio = new Audio();
-            audio.crossOrigin = "anonymous";
-            audio.src = urlAudio;
-
-            audio.onplay = () => {
-                stageBox.classList.add('talking');
-                statusMsg.innerText = "VOZ NEURAL ATIVA (CRISTIANO)";
-                statusMsg.style.color = "#00ffcc";
-            };
-
-            audio.onended = () => {
-                stageBox.classList.remove('talking');
-                statusMsg.innerText = "TERMINAL PRONTO.";
-                statusMsg.style.color = "#00d2ff";
-            };
-
-            audio.onerror = () => {
-                console.warn("API externa indisponível. A alternar para a voz do sistema...");
-                falarNativoMasculino(texto);
-            };
-
-            audio.play().catch(() => {
-                console.warn("Autoplay impedido pelo navegador. A alternar para a voz do sistema...");
-                falarNativoMasculino(texto);
-            });
-        }
-
-        function falarNativoMasculino(texto) {
             if (!('speechSynthesis' in window)) return;
-            
-            window.speechSynthesis.cancel();
+
+            window.speechSynthesis.cancel(); // Cancela falas anteriores
+
             const utterance = new SpeechSynthesisUtterance(texto);
             utterance.lang = 'pt-PT';
 
-            if (vozesLocais.length === 0) {
-                vozesLocais = window.speechSynthesis.getVoices();
+            if (vozesDisponiveis.length === 0) {
+                vozesDisponiveis = window.speechSynthesis.getVoices();
             }
 
-            // Procura vozes masculinas locais instaladas
-            const vozHomem = vozesLocais.find(v => 
+            // Procura ativamente por vozes masculinas em Português
+            const vozMasculina = vozesDisponiveis.find(v => 
                 v.lang.includes('pt') && 
                 (v.name.toLowerCase().includes('duarte') || 
+                 v.name.toLowerCase().includes('antonio') || 
+                 v.name.toLowerCase().includes('antónio') || 
                  v.name.toLowerCase().includes('daniel') || 
-                 v.name.toLowerCase().includes('ricardo') || 
-                 v.name.toLowerCase().includes('cristiano') ||
-                 v.name.toLowerCase().includes('male'))
+                 v.name.toLowerCase().includes('fabiano') || 
+                 v.name.toLowerCase().includes('julio') || 
+                 v.name.toLowerCase().includes('male') ||
+                 v.name.toLowerCase().includes('homem'))
             );
 
-            if (vozHomem) {
-                utterance.voice = vozHomem;
-            } else {
-                // Ajuste de tom caso só exista voz feminina no SO
-                utterance.pitch = 0.6;
+            if (vozMasculina) {
+                utterance.voice = vozMasculina;
+                utterance.pitch = 0.9;
                 utterance.rate = 0.95;
+            } else {
+                // Caso o sistema operativo só tenha voz feminina instalada, força tom grave
+                utterance.pitch = 0.45; 
+                utterance.rate = 0.90;
             }
 
             utterance.onstart = () => {
                 stageBox.classList.add('talking');
-                statusMsg.innerText = "SIR. COLY A FALAR (LOCAL)";
-                statusMsg.style.color = "#ffcc00";
+                statusMsg.innerText = "SIR. COLY A FALAR...";
+                statusMsg.style.color = "#00ffcc";
             };
 
             utterance.onend = () => {
                 stageBox.classList.remove('talking');
                 statusMsg.innerText = "TERMINAL PRONTO.";
                 statusMsg.style.color = "#00d2ff";
+            };
+
+            utterance.onerror = (e) => {
+                console.error("Erro na reprodução de voz:", e);
+                stageBox.classList.remove('talking');
+                statusMsg.innerText = "ERRO DE ÁUDIO REPETIDO.";
+                statusMsg.style.color = "#ff3333";
             };
 
             window.speechSynthesis.speak(utterance);
