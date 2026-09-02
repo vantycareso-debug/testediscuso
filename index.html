@@ -245,10 +245,26 @@
             if (e.key === "Enter") enviarComando(); 
         });
 
+        // Pré-carrega as vozes locais do sistema operativo
+        let vozesLocais = [];
+        function carregarVozes() {
+            if ('speechSynthesis' in window) {
+                vozesLocais = window.speechSynthesis.getVoices();
+            }
+        }
+        carregarVozes();
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = carregarVozes;
+        }
+
         function falarTexto(texto) {
-            // Chamada direta à voz masculina Cristiano (PT-PT) da Amazon Polly via StreamElements
+            // Limpeza de carateres especiais para evitar erro 401 na API externa
+            const textoLimpo = texto
+                .replace(/[^a-zA-Z0-9 áàâãéèêíóòôõúçÁÀÂÃÉÈÊÍÓÒÔÕÚÇ]/g, "")
+                .trim();
+
             const vozMasculina = "Cristiano"; 
-            const urlAudio = `https://api.streamelements.com/kappa/v2/speech?voice=${vozMasculina}&text=${encodeURIComponent(texto)}`;
+            const urlAudio = `https://api.streamelements.com/kappa/v2/speech?voice=${vozMasculina}&text=${encodeURIComponent(textoLimpo)}`;
 
             const audio = new Audio();
             audio.crossOrigin = "anonymous";
@@ -256,7 +272,7 @@
 
             audio.onplay = () => {
                 stageBox.classList.add('talking');
-                statusMsg.innerText = "VOZ NEURAL ATIVA (CRISTIANO - HOMEM)";
+                statusMsg.innerText = "VOZ NEURAL ATIVA (CRISTIANO)";
                 statusMsg.style.color = "#00ffcc";
             };
 
@@ -266,17 +282,13 @@
                 statusMsg.style.color = "#00d2ff";
             };
 
-            audio.onerror = (err) => {
-                console.error("Erro na API StreamElements:", err);
-                statusMsg.innerText = "AVISO: API BLOQUEADA -> A USAR VOZ DO SISTEMA";
-                statusMsg.style.color = "#ff9900";
+            audio.onerror = () => {
+                console.warn("API externa indisponível. A alternar para a voz do sistema...");
                 falarNativoMasculino(texto);
             };
 
-            audio.play().catch(err => {
-                console.warn("Autoplay bloqueado pelo navegador:", err);
-                statusMsg.innerText = "AVISO: AUTOPLAY BLOQUEADO -> A USAR VOZ DO SISTEMA";
-                statusMsg.style.color = "#ff9900";
+            audio.play().catch(() => {
+                console.warn("Autoplay impedido pelo navegador. A alternar para a voz do sistema...");
                 falarNativoMasculino(texto);
             });
         }
@@ -288,8 +300,12 @@
             const utterance = new SpeechSynthesisUtterance(texto);
             utterance.lang = 'pt-PT';
 
-            const vozes = window.speechSynthesis.getVoices();
-            const vozHomem = vozes.find(v => 
+            if (vozesLocais.length === 0) {
+                vozesLocais = window.speechSynthesis.getVoices();
+            }
+
+            // Procura vozes masculinas locais instaladas
+            const vozHomem = vozesLocais.find(v => 
                 v.lang.includes('pt') && 
                 (v.name.toLowerCase().includes('duarte') || 
                  v.name.toLowerCase().includes('daniel') || 
@@ -300,10 +316,23 @@
 
             if (vozHomem) {
                 utterance.voice = vozHomem;
+            } else {
+                // Ajuste de tom caso só exista voz feminina no SO
+                utterance.pitch = 0.6;
+                utterance.rate = 0.95;
             }
 
-            utterance.onstart = () => stageBox.classList.add('talking');
-            utterance.onend = () => stageBox.classList.remove('talking');
+            utterance.onstart = () => {
+                stageBox.classList.add('talking');
+                statusMsg.innerText = "SIR. COLY A FALAR (LOCAL)";
+                statusMsg.style.color = "#ffcc00";
+            };
+
+            utterance.onend = () => {
+                stageBox.classList.remove('talking');
+                statusMsg.innerText = "TERMINAL PRONTO.";
+                statusMsg.style.color = "#00d2ff";
+            };
 
             window.speechSynthesis.speak(utterance);
         }
